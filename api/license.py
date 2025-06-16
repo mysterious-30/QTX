@@ -1,72 +1,52 @@
+from http.server import BaseHTTPRequestHandler
 import json
 import os
-from typing import Dict, Any
 
-def load_license_db() -> Dict[str, Any]:
-    try:
-        if os.path.exists('LICENSE_KEYS.json'):
-            with open('LICENSE_KEYS.json', 'r') as f:
-                return json.load(f)
-        return {
-            "DEMO-1234-5678-9012": {
-                "active": True,
-                "features": ["premium"]
-            }
-        }
-    except Exception as e:
-        print(f"License DB error: {str(e)}")
-        return {}
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length)
 
-def verify_license(license_key: str) -> Dict[str, Any]:
-    license_db = load_license_db()
-    license_key = license_key.upper().strip()
+        try:
+            data = json.loads(post_data.decode())
+            license_key = data.get("licenseKey", "").upper().strip()
+        except Exception as e:
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
+            return
 
-    if not license_key:
-        return {"error": "License key required", "statusCode": 400}
-
-    if license_key in license_db and license_db[license_key].get('active', False):
-        return {
-            "valid": True,
-            "licenseKey": license_key,
-            "features": license_db[license_key].get('features', []),
-            "statusCode": 200
-        }
-
-    return {"error": "Invalid license key", "statusCode": 403}
-
-# ✅ This is now the Vercel-compatible function
-def main(request: dict) -> dict:
-    try:
-        if request['method'] == 'POST':
-            body = request.get('body', '{}')
-            try:
-                data = json.loads(body)
-            except json.JSONDecodeError:
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps({"error": "Invalid JSON"}),
-                    "headers": {"Content-Type": "application/json"}
+        # Load license DB
+        try:
+            with open("LICENSE_KEYS.json", "r") as f:
+                license_db = json.load(f)
+        except Exception as e:
+            license_db = {
+                "DEMO-1234-5678-9012": {
+                    "active": True,
+                    "features": ["premium"]
                 }
-
-            license_key = data.get('licenseKey', '')
-            result = verify_license(license_key)
-
-            return {
-                "statusCode": result.get('statusCode', 200),
-                "body": json.dumps({k: v for k, v in result.items() if k != 'statusCode'}),
-                "headers": {"Content-Type": "application/json"}
             }
 
-        return {
-            "statusCode": 405,
-            "body": json.dumps({"error": "Method not allowed"}),
-            "headers": {"Content-Type": "application/json"}
-        }
+        if not license_key:
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "License key required"}).encode())
+            return
 
-    except Exception as e:
-        print(f"Handler error: {str(e)}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Internal server error"}),
-            "headers": {"Content-Type": "application/json"}
-        }
+        if license_key in license_db and license_db[license_key].get("active", False):
+            response = {
+                "valid": True,
+                "licenseKey": license_key,
+                "features": license_db[license_key].get("features", [])
+            }
+            self.send_response(200)
+        else:
+            response = {"error": "Invalid license key"}
+            self.send_response(403)
+
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(response).encode())
