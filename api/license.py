@@ -38,7 +38,7 @@ def verify_license(license_key: str) -> Dict[str, Any]:
     return {"error": "Invalid license key", "statusCode": 403}
 
 # Vercel-compatible handler (REQUIRED)
-def handler(request: dict) -> dict:
+def main(request: dict) -> dict:
     """Vercel serverless function entry point"""
     try:
         if request['method'] == 'POST':
