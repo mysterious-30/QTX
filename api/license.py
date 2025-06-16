@@ -1,7 +1,7 @@
 import json
 import os
 from typing import Dict, Any
-
+handler = handler
 # License database setup
 def load_license_db() -> Dict[str, Any]:
     """Load license keys from JSON file or return default"""
