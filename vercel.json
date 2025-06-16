@@ -8,8 +8,16 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "api/main.py"
+    },
+    {
+      "src": "/license/verify",
+      "dest": "api/license.py"
+    },
+    {
+      "src": "/premium/feature",
+      "dest": "api/premium.py"
     }
   ]
 }
