@@ -1,16 +1,6 @@
 {
-    "ABCD-1234-EFGH-5678": {
-        "active": true,
-        "user": "user@example.com",
-        "created": "2023-01-01",
-        "expires": "2024-01-01",
-        "features": ["premium", "vip"]
-    },
     "DEMO-1234-5678-9012": {
         "active": true,
-        "user": "demo@example.com",
-        "created": "2023-06-01",
-        "expires": "2024-06-01",
         "features": ["premium"]
     }
 }
