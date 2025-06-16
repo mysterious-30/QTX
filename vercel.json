@@ -8,12 +8,16 @@
   ],
   "routes": [
     {
+      "src": "/",
+      "dest": "api/health.py"
+    },
+    {
       "src": "/api/health",
       "dest": "api/health.py"
     },
     {
-      "src": "/",
-      "dest": "api/health.py"
+      "src": "/api/license/verify",
+      "dest": "api/license.py"
     }
   ]
 }
