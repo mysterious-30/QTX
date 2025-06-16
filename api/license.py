@@ -3,10 +3,6 @@ import json
 import os
 
 class LicenseVerifier(BaseHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        self.license_db = self._load_license_db()
-        super().__init__(*args, **kwargs)
-    
     def _load_license_db(self):
         """Load license keys from file or return demo key"""
         try:
@@ -20,17 +16,18 @@ class LicenseVerifier(BaseHTTPRequestHandler):
                 }
             }
         except Exception as e:
-            print(f"Error loading license DB: {str(e)}")
+            print(f"License DB error: {str(e)}")
             return {}
 
     def do_POST(self):
-        """Handle license verification requests"""
+        """Handle POST requests"""
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data)
             
             license_key = data.get('licenseKey', '').upper().strip()
+            self.license_db = self._load_license_db()
             
             if not license_key:
                 return self._send_response(400, {"error": "License key required"})
@@ -41,33 +38,42 @@ class LicenseVerifier(BaseHTTPRequestHandler):
                     "licenseKey": license_key,
                     "features": self.license_db[license_key].get('features', [])
                 })
-            else:
-                return self._send_response(403, {"error": "Invalid license key"})
-                
+            return self._send_response(403, {"error": "Invalid license key"})
+            
         except Exception as e:
-            print(f"Error processing request: {str(e)}")
+            print(f"Handler error: {str(e)}")
             return self._send_response(500, {"error": "Internal server error"})
 
     def _send_response(self, status_code, data):
-        """Helper to send JSON responses"""
+        """Send JSON response"""
         self.send_response(status_code)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 
-# Vercel-compatible handler function
-def handler(request):
-    """Entry point for Vercel serverless function"""
-    verifier = LicenseVerifier(
-        request,
-        None,  # server
-        None,   # client_address
-        False   # suppress_log
-    )
-    verifier.request = request
-    verifier.handle()
+# Vercel-specific handler wrapper
+def vercel_handler(request):
+    """Vercel-compatible handler entry point"""
+    class VercelWrapper(LicenseVerifier):
+        def __init__(self):
+            self.request = request
+            self.response = type('', (), {})()  # Response placeholder
+            
+        def handle(self):
+            """Process the request"""
+            try:
+                if self.request.method == 'POST':
+                    self.do_POST()
+                else:
+                    self._send_response(405, {"error": "Method not allowed"})
+            except Exception as e:
+                print(f"Vercel handler error: {str(e)}")
+                self._send_response(500, {"error": "Handler failed"})
+    
+    handler = VercelWrapper()
+    handler.handle()
     return {
-        'statusCode': verifier.response.status,
-        'headers': dict(verifier.response.headers),
-        'body': verifier.response.body.decode() if hasattr(verifier.response, 'body') else ''
+        'statusCode': handler.response.status if hasattr(handler.response, 'status') else 500,
+        'headers': getattr(handler.response, 'headers', {'Content-Type': 'application/json'}),
+        'body': handler.response.body.decode() if hasattr(handler.response, 'body') else json.dumps({"error": "Unknown error"})
     }
