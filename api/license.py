@@ -2,7 +2,6 @@ import json
 import os
 from typing import Dict, Any
 
-# Load license database
 def load_license_db() -> Dict[str, Any]:
     try:
         if os.path.exists('LICENSE_KEYS.json'):
@@ -18,7 +17,6 @@ def load_license_db() -> Dict[str, Any]:
         print(f"License DB error: {str(e)}")
         return {}
 
-# License verification logic
 def verify_license(license_key: str) -> Dict[str, Any]:
     license_db = load_license_db()
     license_key = license_key.upper().strip()
@@ -36,8 +34,8 @@ def verify_license(license_key: str) -> Dict[str, Any]:
 
     return {"error": "Invalid license key", "statusCode": 403}
 
-# Main handler function
-def handle_license_verification(request: dict) -> dict:
+# ✅ This is now the Vercel-compatible function
+def main(request: dict) -> dict:
     try:
         if request['method'] == 'POST':
             body = request.get('body', '{}')
@@ -72,6 +70,3 @@ def handle_license_verification(request: dict) -> dict:
             "body": json.dumps({"error": "Internal server error"}),
             "headers": {"Content-Type": "application/json"}
         }
-
-# ✅ Exported Vercel-compatible function
-handler = handle_license_verification
