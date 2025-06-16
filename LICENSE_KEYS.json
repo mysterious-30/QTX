@@ -4,13 +4,13 @@
         "user": "user@example.com",
         "created": "2023-01-01",
         "expires": "2024-01-01",
-        "features": ["premium"]
+        "features": ["premium", "vip"]
     },
-    "WXYZ-9876-UVST-5432": {
+    "DEMO-1234-5678-9012": {
         "active": true,
-        "user": "test@test.com",
+        "user": "demo@example.com",
         "created": "2023-06-01",
         "expires": "2024-06-01",
-        "features": ["premium", "vip"]
+        "features": ["premium"]
     }
 }
