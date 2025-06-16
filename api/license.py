@@ -1,10 +1,9 @@
 import json
 import os
 from typing import Dict, Any
-handler = handler
-# License database setup
+
+# Load license database
 def load_license_db() -> Dict[str, Any]:
-    """Load license keys from JSON file or return default"""
     try:
         if os.path.exists('LICENSE_KEYS.json'):
             with open('LICENSE_KEYS.json', 'r') as f:
@@ -19,15 +18,14 @@ def load_license_db() -> Dict[str, Any]:
         print(f"License DB error: {str(e)}")
         return {}
 
-# Main verification logic
+# License verification logic
 def verify_license(license_key: str) -> Dict[str, Any]:
-    """Verify license key against database"""
     license_db = load_license_db()
     license_key = license_key.upper().strip()
-    
+
     if not license_key:
         return {"error": "License key required", "statusCode": 400}
-        
+
     if license_key in license_db and license_db[license_key].get('active', False):
         return {
             "valid": True,
@@ -35,14 +33,13 @@ def verify_license(license_key: str) -> Dict[str, Any]:
             "features": license_db[license_key].get('features', []),
             "statusCode": 200
         }
+
     return {"error": "Invalid license key", "statusCode": 403}
 
-# Vercel-compatible handler (REQUIRED)
-def main(request: dict) -> dict:
-    """Vercel serverless function entry point"""
+# Main handler function
+def handle_license_verification(request: dict) -> dict:
     try:
         if request['method'] == 'POST':
-            # Parse request body
             body = request.get('body', '{}')
             try:
                 data = json.loads(body)
@@ -52,23 +49,22 @@ def main(request: dict) -> dict:
                     "body": json.dumps({"error": "Invalid JSON"}),
                     "headers": {"Content-Type": "application/json"}
                 }
-            
-            # Verify license
+
             license_key = data.get('licenseKey', '')
             result = verify_license(license_key)
-            
+
             return {
                 "statusCode": result.get('statusCode', 200),
                 "body": json.dumps({k: v for k, v in result.items() if k != 'statusCode'}),
                 "headers": {"Content-Type": "application/json"}
             }
-        
+
         return {
             "statusCode": 405,
             "body": json.dumps({"error": "Method not allowed"}),
             "headers": {"Content-Type": "application/json"}
         }
-        
+
     except Exception as e:
         print(f"Handler error: {str(e)}")
         return {
@@ -76,3 +72,6 @@ def main(request: dict) -> dict:
             "body": json.dumps({"error": "Internal server error"}),
             "headers": {"Content-Type": "application/json"}
         }
+
+# ✅ Exported Vercel-compatible function
+handler = handle_license_verification
