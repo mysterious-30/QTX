@@ -1,7 +1,7 @@
 import json
+import os
 
 def handler(request):
-    # Handle CORS preflight
     if request["method"] == "OPTIONS":
         return {
             "statusCode": 204,
@@ -17,8 +17,8 @@ def handler(request):
         body = json.loads(request["body"])
         license_key = body.get("license_key")
 
-        # Load valid keys from licenses.json
-        with open("api/licenses.json", "r") as f:
+        # Load from root directory
+        with open(os.path.join(os.path.dirname(__file__), "../licenses.json"), "r") as f:
             valid_keys = json.load(f)
 
         if license_key in valid_keys["keys"]:
