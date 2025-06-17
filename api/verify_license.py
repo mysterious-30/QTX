@@ -8,7 +8,7 @@ def handler(request):
             "headers": {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Headers": "Content-Type"
             },
             "body": ""
         }
@@ -17,8 +17,9 @@ def handler(request):
         body = json.loads(request["body"])
         license_key = body.get("license_key")
 
-        # Load from root directory
-        with open(os.path.join(os.path.dirname(__file__), "../licenses.json"), "r") as f:
+        # Load JSON file from one directory above (root)
+        licenses_path = os.path.join(os.path.dirname(__file__), "../licenses.json")
+        with open(licenses_path, "r") as f:
             valid_keys = json.load(f)
 
         if license_key in valid_keys["keys"]:
@@ -33,8 +34,6 @@ def handler(request):
         "statusCode": 200,
         "headers": {
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
             "Content-Type": "application/json"
         },
         "body": json.dumps(result)
