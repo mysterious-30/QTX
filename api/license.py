@@ -12,32 +12,35 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class handler(BaseHTTPRequestHandler):
-    def _set_headers(self):
-        self.send_response(200)
+    def _set_headers(self, status=200):
+        self.send_response(status)
         self.send_header('Content-type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Accept')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Accept, Origin')
+        self.send_header('Access-Control-Max-Age', '86400')  # 24 hours
         self.end_headers()
 
     def do_OPTIONS(self):
-        self._set_headers()
+        self._set_headers(204)
 
     def _send_json_response(self, data, status=200):
-        self.send_response(status)
-        self._set_headers()
+        self._set_headers(status)
         self.wfile.write(json.dumps(data).encode())
 
     def do_POST(self):
         try:
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            
-            if not post_data:
+            # Log request details
+            logger.info(f"Received request from {self.client_address[0]}")
+            logger.info(f"Request headers: {dict(self.headers)}")
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length == 0:
                 logger.error("Empty request body")
                 self._send_json_response({"error": "Empty request body"}, 400)
                 return
 
+            post_data = self.rfile.read(content_length)
             try:
                 data = json.loads(post_data.decode('utf-8'))
             except json.JSONDecodeError as e:
