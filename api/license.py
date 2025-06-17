@@ -1,6 +1,9 @@
+import logging
 from http.server import BaseHTTPRequestHandler
 import json
 import os
+
+logging.basicConfig(level=logging.INFO)
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -22,10 +25,11 @@ class handler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
+            response = {"valid": False, "error": "Invalid JSON"}
+            logging.info(f"Sending response: {response}")
+            self.wfile.write(json.dumps(response).encode())
             return
 
-        # Load license DB
         try:
             with open("LICENSE_KEYS.json", "r") as f:
                 license_db = json.load(f)
@@ -42,7 +46,9 @@ class handler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps({"error": "License key required"}).encode())
+            response = {"valid": False, "error": "License key required"}
+            logging.info(f"Sending response: {response}")
+            self.wfile.write(json.dumps(response).encode())
             return
 
         if license_key in license_db and license_db[license_key].get("active", False):
@@ -53,9 +59,10 @@ class handler(BaseHTTPRequestHandler):
             }
             self.send_response(200)
         else:
-            response = {"error": "Invalid license key"}
+            response = {"valid": False, "error": "Invalid license key"}
             self.send_response(403)
 
+        logging.info(f"Sending response: {response}")
         self.send_header('Content-Type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
