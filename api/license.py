@@ -1,52 +1,56 @@
-from http.server import BaseHTTPRequestHandler
 import json
 import os
+import logging
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from datetime import datetime
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        content_length = int(self.headers.get('Content-Length', 0))
-        post_data = self.rfile.read(content_length)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-        try:
-            data = json.loads(post_data.decode())
-            license_key = data.get("licenseKey", "").upper().strip()
-        except Exception as e:
-            self.send_response(400)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
-            return
+app = FastAPI()
 
-        # Load license DB
-        try:
-            with open("LICENSE_KEYS.json", "r") as f:
-                license_db = json.load(f)
-        except Exception as e:
-            license_db = {
-                "DEMO-1234-5678-9012": {
-                    "active": True,
-                    "features": ["premium"]
-                }
-            }
+class LicenseRequest(BaseModel):
+    licenseKey: str
 
-        if not license_key:
-            self.send_response(400)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "License key required"}).encode())
-            return
+def get_license_db():
+    """Get license database from environment variable"""
+    license_db_str = os.getenv('LICENSE_KEYS', '{}')
+    try:
+        return json.loads(license_db_str)
+    except json.JSONDecodeError:
+        logger.error("Invalid license database format in environment variable")
+        return {}
 
-        if license_key in license_db and license_db[license_key].get("active", False):
-            response = {
+@app.post("/api/license/verify")
+async def verify_license(request: LicenseRequest):
+    try:
+        license_key = request.licenseKey
+        logger.info(f"Received license key: {license_key}")
+
+        # Get license database from environment
+        license_db = get_license_db()
+
+        # Check if license key exists and is valid
+        if license_key in license_db:
+            logger.info(f"Valid license key: {license_key}")
+            return {
                 "valid": True,
-                "licenseKey": license_key,
-                "features": license_db[license_key].get("features", [])
+                "message": "License key is valid",
+                "timestamp": datetime.now().isoformat()
             }
-            self.send_response(200)
         else:
-            response = {"error": "Invalid license key"}
-            self.send_response(403)
+            logger.warning(f"Invalid license key: {license_key}")
+            return {
+                "valid": False,
+                "error": "Invalid license key",
+                "timestamp": datetime.now().isoformat()
+            }
 
-        self.send_header('Content-Type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(response).encode())
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
