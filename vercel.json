@@ -2,18 +2,44 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/*.py",
+      "src": "api/main.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
-      "src": "/api/health",
-      "dest": "api/health.py"
+      "src": "/api/license/verify",
+      "dest": "api/main.py",
+      "methods": ["POST", "OPTIONS"]
     },
     {
-      "src": "/api/license/verify",
-      "dest": "api/license.py"
+      "src": "/api/health",
+      "dest": "api/main.py",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "/",
+      "dest": "api/main.py",
+      "methods": ["GET", "OPTIONS"]
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
     }
   ]
 }
