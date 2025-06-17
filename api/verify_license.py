@@ -1,6 +1,7 @@
 import json
 
 def handler(request):
+    # Handle preflight CORS (OPTIONS method)
     if request["method"] == "OPTIONS":
         return {
             "statusCode": 204,
