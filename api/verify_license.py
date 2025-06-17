@@ -17,7 +17,8 @@ def handler(request):
         body = json.loads(request["body"])
         license_key = body.get("license_key")
 
-        with open("licenses.json", "r") as f:
+        # Load valid keys from licenses.json
+        with open("api/licenses.json", "r") as f:
             valid_keys = json.load(f)
 
         if license_key in valid_keys["keys"]:
