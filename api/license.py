@@ -2,6 +2,7 @@ import logging
 from http.server import BaseHTTPRequestHandler
 import json
 import os
+from http.server import HTTPServer
 
 logging.basicConfig(level=logging.INFO)
 
@@ -10,7 +11,7 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Accept')
         self.end_headers()
 
     def do_POST(self):
@@ -70,3 +71,8 @@ class handler(BaseHTTPRequestHandler):
 
         self.end_headers()
         self.wfile.write(json.dumps(response).encode())
+
+if __name__ == '__main__':
+    server = HTTPServer(('localhost', 3000), handler)
+    logging.info('Starting server on port 3000...')
+    server.serve_forever()
