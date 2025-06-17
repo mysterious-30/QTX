@@ -1,7 +1,7 @@
-import logging
-from http.server import BaseHTTPRequestHandler
 import json
 import os
+import logging
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
 # Configure logging
@@ -9,108 +9,87 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
 
 class handler(BaseHTTPRequestHandler):
-    def _set_headers(self, status_code=200):
-        """Set common headers for all responses"""
-        self.send_response(status_code)
+    def _set_headers(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Accept')
-        self.send_header('Content-Type', 'application/json')
-
-    def _send_json_response(self, data, status_code=200):
-        """Helper method to send JSON response"""
-        self._set_headers(status_code)
         self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
 
     def do_OPTIONS(self):
-        """Handle preflight requests"""
-        self._set_headers(204)
-        self.end_headers()
+        self._set_headers()
+
+    def _send_json_response(self, data, status=200):
+        self.send_response(status)
+        self._set_headers()
+        self.wfile.write(json.dumps(data).encode())
 
     def do_POST(self):
-        """Handle POST requests for license verification"""
         try:
-            # Read and parse request body
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length == 0:
-                self._send_json_response(
-                    {"valid": False, "error": "Empty request body"},
-                    status_code=400
-                )
-                return
-
+            content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
+            
+            if not post_data:
+                logger.error("Empty request body")
+                self._send_json_response({"error": "Empty request body"}, 400)
+                return
+
             try:
-                data = json.loads(post_data.decode())
-            except json.JSONDecodeError:
-                self._send_json_response(
-                    {"valid": False, "error": "Invalid JSON format"},
-                    status_code=400
-                )
+                data = json.loads(post_data.decode('utf-8'))
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON: {str(e)}")
+                self._send_json_response({"error": "Invalid JSON format"}, 400)
                 return
 
-            license_key = data.get("licenseKey", "").upper().strip()
-            logging.info(f"Received license key: {license_key}")
-
-            # Validate license key format
-            if not license_key or len(license_key) < 5:
-                self._send_json_response(
-                    {"valid": False, "error": "Invalid license key format"},
-                    status_code=400
-                )
+            license_key = data.get('licenseKey')
+            if not license_key:
+                logger.error("No license key provided")
+                self._send_json_response({"error": "No license key provided"}, 400)
                 return
+
+            logger.info(f"Received license key: {license_key}")
 
             # Load license database
             try:
-                with open("LICENSE_KEYS.json", "r") as f:
+                with open('LICENSE_KEYS.json', 'r') as f:
                     license_db = json.load(f)
-            except Exception as e:
-                logging.error(f"Error loading license DB: {str(e)}")
-                license_db = {
-                    "DEMO-1234-5678-9012": {
-                        "active": True,
-                        "features": ["premium"],
-                        "created_at": datetime.now().isoformat()
-                    }
-                }
+            except FileNotFoundError:
+                logger.error("License database not found")
+                self._send_json_response({"error": "License database not found"}, 500)
+                return
+            except json.JSONDecodeError:
+                logger.error("Invalid license database format")
+                self._send_json_response({"error": "Invalid license database format"}, 500)
+                return
 
-            # Check license validity
-            if license_key in license_db and license_db[license_key].get("active", False):
-                response = {
+            # Check if license key exists and is valid
+            if license_key in license_db:
+                logger.info(f"Valid license key: {license_key}")
+                self._send_json_response({
                     "valid": True,
-                    "licenseKey": license_key,
-                    "features": license_db[license_key].get("features", []),
+                    "message": "License key is valid",
                     "timestamp": datetime.now().isoformat()
-                }
-                logging.info(f"Valid license key: {license_key}")
-                self._send_json_response(response, status_code=200)
+                })
             else:
-                response = {
+                logger.warning(f"Invalid license key: {license_key}")
+                self._send_json_response({
                     "valid": False,
-                    "error": "Invalid or inactive license key",
+                    "error": "Invalid license key",
                     "timestamp": datetime.now().isoformat()
-                }
-                logging.info(f"Invalid license key: {license_key}")
-                self._send_json_response(response, status_code=403)
+                })
 
         except Exception as e:
-            logging.error(f"Unexpected error: {str(e)}")
-            self._send_json_response(
-                {
-                    "valid": False,
-                    "error": "Internal server error",
-                    "timestamp": datetime.now().isoformat()
-                },
-                status_code=500
-            )
+            logger.error(f"Unexpected error: {str(e)}")
+            self._send_json_response({"error": "Internal server error"}, 500)
 
 def run(server_class=HTTPServer, handler_class=handler, port=3000):
-    server_address = ('', port)  # Empty string means listen on all available interfaces
+    server_address = ('', port)
     httpd = server_class(server_address, handler_class)
-    logging.info(f'Starting server on port {port}...')
+    logger.info(f"Starting server on port {port}...")
     httpd.serve_forever()
 
 if __name__ == '__main__':
