@@ -60,7 +60,7 @@ async def health_check() -> Dict[str, str]:
 @app.post("/api/license/verify", response_model=LicenseResponse)
 async def verify_license(request: LicenseRequest) -> LicenseResponse:
     """
-    Verify a license key
+    Verify a license key and check its expiration date
     """
     try:
         license_key = request.licenseKey.strip().upper()
@@ -72,6 +72,37 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
         license_db = get_license_db()
         
         if license_key in license_db:
+            license_data = license_db[license_key]
+            
+            # Check if license is active
+            if not license_data.get("active", False):
+                logger.warning(f"Inactive license key: {license_key}")
+                return LicenseResponse(
+                    valid=False,
+                    message="License key is inactive",
+                    timestamp=datetime.now().isoformat()
+                )
+            
+            # Check expiration date
+            expires_at = license_data.get("expires_at")
+            if expires_at:
+                try:
+                    expiration_date = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                    if datetime.now(expiration_date.tzinfo) > expiration_date:
+                        logger.warning(f"Expired license key: {license_key}")
+                        return LicenseResponse(
+                            valid=False,
+                            message="License key has expired",
+                            timestamp=datetime.now().isoformat()
+                        )
+                except ValueError as e:
+                    logger.error(f"Invalid expiration date format for key {license_key}: {str(e)}")
+                    return LicenseResponse(
+                        valid=False,
+                        message="Invalid license key format",
+                        timestamp=datetime.now().isoformat()
+                    )
+            
             logger.info(f"Valid license key: {license_key}")
             return LicenseResponse(
                 valid=True,
