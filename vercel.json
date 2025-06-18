@@ -3,13 +3,31 @@
   "builds": [
     {
       "src": "api/main.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.9"
+      }
     },
     {
       "src": "LICENSE_KEYS.json",
       "use": "@vercel/static"
     }
   ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "api/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "api/main.py"
+    }
+  ],
+  "env": {
+    "VPS_API_URL": "http://79.99.40.71:6401",
+    "VPS_API_KEY": "696969"
+  },
   "rewrites": [
     {
       "source": "/api/license/verify",
@@ -25,10 +43,6 @@
     },
     {
       "source": "/api/health",
-      "destination": "api/main.py"
-    },
-    {
-      "source": "/",
       "destination": "api/main.py"
     }
   ],
