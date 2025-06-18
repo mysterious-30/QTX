@@ -57,8 +57,8 @@ class LicenseRequest(BaseModel):
 class TransferRequest(BaseModel):
     licenseKey: str
     currentDeviceId: str
-    newDeviceId: str
-    transferCode: str  # For security
+    newDeviceId: Optional[str] = None
+    transferCode: str
 
 class DeviceInfo(BaseModel):
     deviceId: str
