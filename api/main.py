@@ -5,7 +5,8 @@ import json
 import os
 import logging
 from datetime import datetime
-from typing import Dict, Any
+import pytz
+from typing import Dict, Any, Optional
 
 # Configure logging
 logging.basicConfig(
@@ -13,6 +14,9 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Set IST timezone
+IST = pytz.timezone('Asia/Kolkata')
 
 app = FastAPI(title="QTX License Server")
 
@@ -32,6 +36,7 @@ class LicenseResponse(BaseModel):
     valid: bool
     message: str
     timestamp: str
+    expires_at: Optional[str] = None
 
 def get_license_db() -> Dict[str, Any]:
     """Get license database from LICENSE_KEYS.json file"""
@@ -80,41 +85,49 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
                 return LicenseResponse(
                     valid=False,
                     message="License key is inactive",
-                    timestamp=datetime.now().isoformat()
+                    timestamp=datetime.now(IST).isoformat()
                 )
             
             # Check expiration date
             expires_at = license_data.get("expires_at")
             if expires_at:
                 try:
+                    # Convert UTC to IST for comparison
                     expiration_date = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
-                    if datetime.now(expiration_date.tzinfo) > expiration_date:
+                    expiration_date_ist = expiration_date.astimezone(IST)
+                    current_time = datetime.now(IST)
+                    
+                    if current_time > expiration_date_ist:
                         logger.warning(f"Expired license key: {license_key}")
                         return LicenseResponse(
                             valid=False,
                             message="License key has expired",
-                            timestamp=datetime.now().isoformat()
+                            timestamp=current_time.isoformat()
                         )
+                    
+                    # Format expiration date in IST for response
+                    expires_at_ist = expiration_date_ist.isoformat()
                 except ValueError as e:
                     logger.error(f"Invalid expiration date format for key {license_key}: {str(e)}")
                     return LicenseResponse(
                         valid=False,
                         message="Invalid license key format",
-                        timestamp=datetime.now().isoformat()
+                        timestamp=datetime.now(IST).isoformat()
                     )
             
             logger.info(f"Valid license key: {license_key}")
             return LicenseResponse(
                 valid=True,
                 message="License key is valid",
-                timestamp=datetime.now().isoformat()
+                timestamp=datetime.now(IST).isoformat(),
+                expires_at=expires_at_ist if expires_at else None
             )
         
         logger.warning(f"Invalid license key: {license_key}")
         return LicenseResponse(
             valid=False,
             message="Invalid license key",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now(IST).isoformat()
         )
 
     except HTTPException:
