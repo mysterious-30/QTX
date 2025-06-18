@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 import json
 import os
 import logging
@@ -57,8 +57,14 @@ class LicenseRequest(BaseModel):
 class TransferRequest(BaseModel):
     licenseKey: str
     currentDeviceId: str
-    newDeviceId: Optional[str] = None
+    newDeviceId: str = ""  # Default to empty string
     transferCode: str
+
+    @validator('newDeviceId')
+    def validate_new_device_id(cls, v):
+        if v is None:
+            return ""
+        return v
 
 class DeviceInfo(BaseModel):
     deviceId: str
