@@ -31,6 +31,7 @@ app.add_middleware(
 
 class LicenseRequest(BaseModel):
     licenseKey: str
+    deviceId: str
 
 class LicenseResponse(BaseModel):
     valid: bool
@@ -56,6 +57,18 @@ def get_license_db() -> Dict[str, Any]:
         logger.error(f"Invalid JSON format in LICENSE_KEYS.json at {file_path}")
         return {}
 
+def save_license_db(license_db: Dict[str, Any]) -> None:
+    """Save license database to LICENSE_KEYS.json file"""
+    try:
+        file_path = 'LICENSE_KEYS.json'
+        if not os.path.exists(file_path):
+            file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'LICENSE_KEYS.json')
+        
+        with open(file_path, 'w') as f:
+            json.dump(license_db, f, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving LICENSE_KEYS.json: {str(e)}")
+
 @app.get("/")
 @app.get("/api/health")
 async def health_check() -> Dict[str, str]:
@@ -69,10 +82,13 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
     """
     try:
         license_key = request.licenseKey.strip().upper()
-        logger.info(f"Verifying license key: {license_key}")
+        device_id = request.deviceId.strip()
+        logger.info(f"Verifying license key: {license_key} for device: {device_id}")
 
         if not license_key:
             raise HTTPException(status_code=400, detail="License key cannot be empty")
+        if not device_id:
+            raise HTTPException(status_code=400, detail="Device ID cannot be empty")
 
         license_db = get_license_db()
         
@@ -85,6 +101,16 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
                 return LicenseResponse(
                     valid=False,
                     message="License key is inactive",
+                    timestamp=datetime.now(IST).isoformat()
+                )
+            
+            # Check device ID
+            stored_device_id = license_data.get("device_id")
+            if stored_device_id and stored_device_id != device_id:
+                logger.warning(f"License key {license_key} is already in use by another device")
+                return LicenseResponse(
+                    valid=False,
+                    message="License key is already in use by another device",
                     timestamp=datetime.now(IST).isoformat()
                 )
             
@@ -113,6 +139,13 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
                         message="Invalid license key format",
                         timestamp=datetime.now(IST).isoformat()
                     )
+            
+            # If this is the first time using the license, store the device ID
+            if not stored_device_id:
+                license_data["device_id"] = device_id
+                license_db[license_key] = license_data
+                save_license_db(license_db)
+                logger.info(f"License key {license_key} registered to device {device_id}")
             
             logger.info(f"Valid license key: {license_key}")
             return LicenseResponse(
