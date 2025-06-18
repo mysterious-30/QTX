@@ -24,12 +24,21 @@ class LicenseResponse(BaseModel):
     timestamp: str
 
 def get_license_db() -> Dict[str, Any]:
-    """Get license database from environment variable"""
+    """Get license database from LICENSE_KEYS.json file"""
     try:
-        license_db_str = os.getenv('LICENSE_KEYS', '{}')
-        return json.loads(license_db_str)
+        # Try to find the file in the current directory first
+        file_path = 'LICENSE_KEYS.json'
+        if not os.path.exists(file_path):
+            # If not found, try the parent directory
+            file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'LICENSE_KEYS.json')
+        
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logger.error(f"LICENSE_KEYS.json not found at {file_path}. Please create it.")
+        return {}
     except json.JSONDecodeError:
-        logger.error("Invalid license database format in environment variable")
+        logger.error(f"Invalid JSON format in LICENSE_KEYS.json at {file_path}")
         return {}
 
 @app.get("/")
