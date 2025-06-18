@@ -16,6 +16,14 @@
       "destination": "api/main.py"
     },
     {
+      "source": "/api/license/transfer",
+      "destination": "api/main.py"
+    },
+    {
+      "source": "/api/license/reset-device",
+      "destination": "api/main.py"
+    },
+    {
       "source": "/api/health",
       "destination": "api/main.py"
     },
@@ -30,7 +38,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "*"
+          "value": "https://xenon-qtx.vercel.app,chrome-extension://*"
         },
         {
           "key": "Access-Control-Allow-Methods",
@@ -38,7 +46,7 @@
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, X-Requested-With"
+          "value": "Content-Type, Authorization, X-Requested-With, X-API-Key"
         },
         {
           "key": "Access-Control-Max-Age",
