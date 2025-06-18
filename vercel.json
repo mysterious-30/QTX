@@ -6,21 +6,18 @@
       "use": "@vercel/python"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/license/verify",
-      "dest": "api/main.py",
-      "methods": ["POST", "OPTIONS"]
+      "source": "/api/license/verify",
+      "destination": "api/main.py"
     },
     {
-      "src": "/api/health",
-      "dest": "api/main.py",
-      "methods": ["GET", "OPTIONS"]
+      "source": "/api/health",
+      "destination": "api/main.py"
     },
     {
-      "src": "/",
-      "dest": "api/main.py",
-      "methods": ["GET", "OPTIONS"]
+      "source": "/",
+      "destination": "api/main.py"
     }
   ],
   "headers": [
