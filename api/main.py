@@ -8,6 +8,7 @@ from datetime import datetime
 import pytz
 import httpx
 from typing import Dict, Any, Optional, List
+from fastapi.responses import JSONResponse
 
 # Configure logging
 logging.basicConfig(
@@ -106,9 +107,34 @@ def generate_transfer_code(license_key: str, device_id: str) -> str:
 
 @app.get("/")
 @app.get("/api/health")
-async def health_check() -> Dict[str, str]:
+async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    try:
+        # Test VPS connection
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{VPS_API_URL}/api/health",
+                headers={"X-API-Key": VPS_API_KEY}
+            )
+            response.raise_for_status()
+            vps_status = response.json()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now(IST).isoformat(),
+            "vps_connection": "ok",
+            "config": {
+                "vps_url": VPS_API_URL,
+                "api_key_configured": bool(VPS_API_KEY),
+                "allowed_origins": ["https://xenon-qtx.vercel.app", "chrome-extension://*"]
+            }
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Health check failed: {str(e)}"
+        )
 
 @app.post("/api/license/verify", response_model=LicenseResponse)
 async def verify_license(request: LicenseRequest) -> LicenseResponse:
@@ -328,3 +354,15 @@ async def reset_device(request: TransferRequest) -> LicenseTransferResponse:
     except Exception as e:
         logger.error(f"Error during device reset: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Global exception handler"""
+    logger.error(f"Unhandled error: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "error": str(exc)
+        }
+    )
