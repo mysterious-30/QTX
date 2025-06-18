@@ -38,7 +38,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://xenon-qtx.vercel.app,chrome-extension://*"
+          "value": "https://qxbroker.com, *"
         },
         {
           "key": "Access-Control-Allow-Methods",
