@@ -6,6 +6,7 @@ import os
 import logging
 from datetime import datetime
 import pytz
+import httpx
 from typing import Dict, Any, Optional, List
 
 # Configure logging
@@ -18,12 +19,16 @@ logger = logging.getLogger(__name__)
 # Set IST timezone
 IST = pytz.timezone('Asia/Kolkata')
 
+# VPS API configuration
+VPS_API_URL = os.getenv('VPS_API_URL', 'http://79.99.40.71:6401')  # Your VPS address
+VPS_API_KEY = os.getenv('VPS_API_KEY', '696969')  # Your API key
+
 app = FastAPI(title="QTX License Server")
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["https://xenon-qtx.vercel.app", "chrome-extension://*"],  # Match VPS allowed origins
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -57,40 +62,45 @@ class LicenseTransferResponse(BaseModel):
     message: str
     timestamp: str
 
-def get_license_db() -> Dict[str, Any]:
-    """Get license database from LICENSE_KEYS.json file"""
+async def get_license_db() -> Dict[str, Any]:
+    """Get license database from VPS"""
     try:
-        # Try to find the file in the current directory first
-        file_path = 'LICENSE_KEYS.json'
-        if not os.path.exists(file_path):
-            # If not found, try the parent directory
-            file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'LICENSE_KEYS.json')
-        
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logger.error(f"LICENSE_KEYS.json not found at {file_path}. Please create it.")
-        return {}
-    except json.JSONDecodeError:
-        logger.error(f"Invalid JSON format in LICENSE_KEYS.json at {file_path}")
-        return {}
-
-def save_license_db(license_db: Dict[str, Any]) -> None:
-    """Save license database to LICENSE_KEYS.json file"""
-    try:
-        file_path = 'LICENSE_KEYS.json'
-        if not os.path.exists(file_path):
-            file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'LICENSE_KEYS.json')
-        
-        with open(file_path, 'w') as f:
-            json.dump(license_db, f, indent=4)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{VPS_API_URL}/api/licenses",
+                headers={"X-API-Key": VPS_API_KEY}
+            )
+            response.raise_for_status()
+            return response.json()
     except Exception as e:
-        logger.error(f"Error saving LICENSE_KEYS.json: {str(e)}")
+        logger.error(f"Error fetching license data from VPS: {str(e)}")
+        # Return default demo licenses if VPS is unavailable
+        return {
+            "DEMO-1234-5678-9012": {
+                "active": True,
+                "expires_at": "2025-06-18T12:55:00Z",
+                "device_id": None,
+                "device_info": None
+            }
+        }
+
+async def save_license_db(license_db: Dict[str, Any]) -> None:
+    """Save license database to VPS"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{VPS_API_URL}/api/licenses",
+                headers={"X-API-Key": VPS_API_KEY},
+                json=license_db
+            )
+            response.raise_for_status()
+            logger.info("License database updated on VPS")
+    except Exception as e:
+        logger.error(f"Error saving license data to VPS: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save license data")
 
 def generate_transfer_code(license_key: str, device_id: str) -> str:
     """Generate a transfer code for license transfer"""
-    # In a real implementation, this would be more secure
-    # For demo purposes, we'll use a simple hash
     import hashlib
     return hashlib.sha256(f"{license_key}:{device_id}:transfer".encode()).hexdigest()[:8].upper()
 
@@ -115,7 +125,7 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
         if not device_id:
             raise HTTPException(status_code=400, detail="Device ID cannot be empty")
 
-        license_db = get_license_db()
+        license_db = await get_license_db()
         
         if license_key in license_db:
             license_data = license_db[license_key]
@@ -178,13 +188,13 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
                 license_data["device_id"] = device_id
                 license_data["device_info"] = device_info
                 license_db[license_key] = license_data
-                save_license_db(license_db)
+                await save_license_db(license_db)
                 logger.info(f"License key {license_key} registered to device {device_id}")
             else:
                 # Update last active time
                 license_data["device_info"] = device_info
                 license_db[license_key] = license_data
-                save_license_db(license_db)
+                await save_license_db(license_db)
             
             logger.info(f"Valid license key: {license_key}")
             return LicenseResponse(
@@ -222,7 +232,7 @@ async def transfer_license(request: TransferRequest) -> LicenseTransferResponse:
         if not all([license_key, current_device_id, new_device_id, transfer_code]):
             raise HTTPException(status_code=400, detail="All fields are required")
 
-        license_db = get_license_db()
+        license_db = await get_license_db()
         
         if license_key not in license_db:
             return LicenseTransferResponse(
@@ -259,7 +269,7 @@ async def transfer_license(request: TransferRequest) -> LicenseTransferResponse:
             "browser": license_data.get("device_info", {}).get("browser")
         }
         license_db[license_key] = license_data
-        save_license_db(license_db)
+        await save_license_db(license_db)
         
         return LicenseTransferResponse(
             success=True,
@@ -284,7 +294,7 @@ async def reset_device(request: TransferRequest) -> LicenseTransferResponse:
         if not all([license_key, current_device_id, transfer_code]):
             raise HTTPException(status_code=400, detail="All fields are required")
 
-        license_db = get_license_db()
+        license_db = await get_license_db()
         
         if license_key not in license_db:
             return LicenseTransferResponse(
@@ -307,7 +317,7 @@ async def reset_device(request: TransferRequest) -> LicenseTransferResponse:
         license_data.pop("device_id", None)
         license_data.pop("device_info", None)
         license_db[license_key] = license_data
-        save_license_db(license_db)
+        await save_license_db(license_db)
         
         return LicenseTransferResponse(
             success=True,
