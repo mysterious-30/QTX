@@ -4,6 +4,10 @@
     {
       "src": "api/main.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "LICENSE_KEYS.json",
+      "use": "@vercel/static"
     }
   ],
   "rewrites": [
