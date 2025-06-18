@@ -201,6 +201,7 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
             
             # Check expiration date
             expires_at = license_data.get("expires_at")
+            expires_at_ist = None
             if expires_at:
                 try:
                     # Parse the expiration date (already in IST)
@@ -225,12 +226,13 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
                         timestamp=datetime.now(IST).isoformat()
                     )
             
-            # Update device info
+            # Get existing device info or create new
+            existing_device_info = license_data.get("device_info", {}) or {}
             device_info = {
                 "deviceId": device_id,
                 "lastActive": datetime.now(IST).isoformat(),
-                "platform": license_data.get("device_info", {}).get("platform"),
-                "browser": license_data.get("device_info", {}).get("browser")
+                "platform": existing_device_info.get("platform"),
+                "browser": existing_device_info.get("browser")
             }
             
             # If this is the first time using the license, store the device ID
@@ -251,7 +253,7 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
                 valid=True,
                 message="License key is valid",
                 timestamp=datetime.now(IST).isoformat(),
-                expires_at=expires_at_ist if expires_at else None,
+                expires_at=expires_at_ist,
                 deviceInfo=DeviceInfo(**device_info)
             )
         
