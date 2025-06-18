@@ -69,8 +69,6 @@ class TransferRequest(BaseModel):
 class DeviceInfo(BaseModel):
     deviceId: str
     lastActive: str
-    platform: Optional[str] = None
-    browser: Optional[str] = None
 
 class LicenseResponse(BaseModel):
     valid: bool
@@ -231,8 +229,6 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
             device_info = {
                 "deviceId": device_id,
                 "lastActive": datetime.now(IST).isoformat(),
-                "platform": existing_device_info.get("platform"),
-                "browser": existing_device_info.get("browser")
             }
             
             # If this is the first time using the license, store the device ID
@@ -317,8 +313,6 @@ async def transfer_license(request: TransferRequest) -> LicenseTransferResponse:
         license_data["device_info"] = {
             "deviceId": new_device_id,
             "lastActive": datetime.now(IST).isoformat(),
-            "platform": license_data.get("device_info", {}).get("platform"),
-            "browser": license_data.get("device_info", {}).get("browser")
         }
         license_db[license_key] = license_data
         await save_license_db(license_db)
