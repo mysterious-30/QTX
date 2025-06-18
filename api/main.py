@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import json
 import os
@@ -8,7 +9,6 @@ from datetime import datetime
 import pytz
 import httpx
 from typing import Dict, Any, Optional, List
-from fastapi.responses import JSONResponse
 
 # Configure logging
 logging.basicConfig(
@@ -21,19 +21,34 @@ logger = logging.getLogger(__name__)
 IST = pytz.timezone('Asia/Kolkata')
 
 # VPS API configuration
-VPS_API_URL = os.getenv('VPS_API_URL', 'http://79.99.40.71:6401')  # Your VPS address
-VPS_API_KEY = os.getenv('VPS_API_KEY', '696969')  # Your API key
+VPS_API_URL = os.getenv('VPS_API_URL', 'http://79.99.40.71:6401')
+VPS_API_KEY = os.getenv('VPS_API_KEY', '696969')
 
 app = FastAPI(title="QTX License Server")
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://xenon-qtx.vercel.app", "chrome-extension://*"],  # Match VPS allowed origins
+    allow_origins=["https://xenon-qtx.vercel.app", "chrome-extension://*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all requests"""
+    logger.info(f"Request: {request.method} {request.url}")
+    try:
+        response = await call_next(request)
+        logger.info(f"Response: {response.status_code}")
+        return response
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal server error: {str(e)}"}
+        )
 
 class LicenseRequest(BaseModel):
     licenseKey: str
@@ -105,7 +120,6 @@ def generate_transfer_code(license_key: str, device_id: str) -> str:
     import hashlib
     return hashlib.sha256(f"{license_key}:{device_id}:transfer".encode()).hexdigest()[:8].upper()
 
-@app.get("/")
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
@@ -114,7 +128,8 @@ async def health_check():
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{VPS_API_URL}/api/health",
-                headers={"X-API-Key": VPS_API_KEY}
+                headers={"X-API-Key": VPS_API_KEY},
+                timeout=5.0
             )
             response.raise_for_status()
             vps_status = response.json()
@@ -131,9 +146,12 @@ async def health_check():
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(
+        return JSONResponse(
             status_code=500,
-            detail=f"Health check failed: {str(e)}"
+            content={
+                "detail": f"Health check failed: {str(e)}",
+                "error": str(e)
+            }
         )
 
 @app.post("/api/license/verify", response_model=LicenseResponse)
