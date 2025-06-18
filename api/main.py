@@ -92,12 +92,11 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
             expires_at = license_data.get("expires_at")
             if expires_at:
                 try:
-                    # Convert UTC to IST for comparison
-                    expiration_date = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
-                    expiration_date_ist = expiration_date.astimezone(IST)
+                    # Parse the expiration date (already in IST)
+                    expiration_date = datetime.fromisoformat(expires_at.replace('Z', '+05:30'))
                     current_time = datetime.now(IST)
                     
-                    if current_time > expiration_date_ist:
+                    if current_time > expiration_date:
                         logger.warning(f"Expired license key: {license_key}")
                         return LicenseResponse(
                             valid=False,
@@ -105,8 +104,8 @@ async def verify_license(request: LicenseRequest) -> LicenseResponse:
                             timestamp=current_time.isoformat()
                         )
                     
-                    # Format expiration date in IST for response
-                    expires_at_ist = expiration_date_ist.isoformat()
+                    # Format expiration date for response (already in IST)
+                    expires_at_ist = expiration_date.isoformat()
                 except ValueError as e:
                     logger.error(f"Invalid expiration date format for key {license_key}: {str(e)}")
                     return LicenseResponse(
